@@ -174,6 +174,7 @@ void HandleMemoryIO(void *userobj, const char *chan, const char *nick, const cha
   int i, j;
   char outbuf[448], *cur = &outbuf[0];
   uint8_t a, b;
+  static boolean write_lock = false;
 
   irc.argToken((char *)message, &args);
   if (args.argc < 3) {
@@ -221,6 +222,7 @@ void HandleMemoryIO(void *userobj, const char *chan, const char *nick, const cha
           irc.sendPrivmsg(chan, nick, "Invalid byte found in write stream; aborting");
           return;
         }
+        cur++;
       }
     }
 
@@ -238,8 +240,18 @@ void HandleMemoryIO(void *userobj, const char *chan, const char *nick, const cha
         b |= a << ((1-j)*4);
       }
       Serial.print(">> Writing hex value "); Serial.print(b, HEX); Serial.print(" to address "); Serial.println((uint32_t)ptr, HEX);
-      *((uint8_t *)ptr+i) = b;
+      if (!write_lock)
+        *(((uint8_t *)ptr)+i) = b;
     }
-    irc.sendPrivmsg(chan, nick, "Write committed.");
+    if (write_lock)
+      irc.sendPrivmsg(chan, nick, "Write ignored due to lock.");
+    else
+      irc.sendPrivmsg(chan, nick, "Write committed.");
+  } else if (!strcmp(args.argv[0], "wrlock")) {
+    if (!strcmp(args.argv[1], "on")) {
+      write_lock = true;
+    } else if (!strcmp(args.argv[1], "off")) {
+      write_lock = false;
+    }
   }
 }
