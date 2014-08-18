@@ -68,6 +68,11 @@ void IrcBot::InitVariables(void)
 	}
 }
 
+void IrcBot::writebuf(const uint8_t *buf)
+{
+	conn.write(buf, strlen((const char *)buf));
+}
+
 /* Main loop where all the processing happens */
 void IrcBot::loop(void)
 {
@@ -96,7 +101,7 @@ void IrcBot::loop(void)
 	switch (botState) {
 		case IRC_DISCONNECTED:
 			if (conn.connected()) {
-				Dbg->println("EthernetClient shows us connected");
+				Dbg->println("Network shows us connected");
 				botState++;
 			} else {
 				Dbg->println("Attempting to connect-");
@@ -104,17 +109,21 @@ void IrcBot::loop(void)
 				Dbg->print("\", "); Dbg->print(_ircport); Dbg->println(");");
 				i = conn.connect(_ircserver, _ircport);
 				Dbg->print("conn.connect() return status = "); Dbg->println(i);
-				for (i=0; i < IRC_CHANNEL_MAX; i++)
-					chanState[i] = IRC_CHAN_NOTJOINED;
-				ringbuf_start = ringbuf_end = 0;
-				_hasmotd = false;
-				botState++;
+				if (i == 1) {  // Connect() successful
+					for (i=0; i < IRC_CHANNEL_MAX; i++)
+						chanState[i] = IRC_CHAN_NOTJOINED;
+					ringbuf_start = ringbuf_end = 0;
+					_hasmotd = false;
+					botState++;
+				} else {
+					Dbg->println("Connection attempt unsuccessful; trying again");
+				}
 			}
 			return;
 
 		case IRC_CONNECTING:
 			if (conn.connected()) {
-				Dbg->println("EthernetClient shows us connected");
+				Dbg->println("Network shows us connected");
 				botState++;
 				// If registered, run the "Connect" callback.
 				executeOnConnectCallback();
@@ -128,7 +137,7 @@ void IrcBot::loop(void)
 			strcpy(abuf, "NICK ");
 			strcat(abuf, _ircnick);
 			strcat(abuf, "\r\n");
-			conn.write(abuf);
+			writebuf(abuf);
 			botState++;
 			Dbg->print(">> Registering nick ("); Dbg->print(_ircnick); Dbg->println(")-");
 			nick_user_millis = millis();
@@ -146,7 +155,7 @@ void IrcBot::loop(void)
 			strcat(bbuf, " 0 * :");
 			strcat(bbuf, _ircdescription);
 			strcat(bbuf, "\r\n");
-			conn.write(bbuf);
+			writebuf(bbuf);
 			botState++;
 			Dbg->println(">> Registering user-");
 			return;
@@ -175,7 +184,7 @@ void IrcBot::loop(void)
 				strcpy(buf, "JOIN ");
 				strcat(buf, _ircchannels[i]);
 				strcat(buf, "\r\n");
-				conn.write(buf);
+				writebuf(buf);
 				chanState[i]++;
 			} /* IRC channel defined or not */
 		} /* IRC_CHAN_NOTJOINED */
@@ -192,7 +201,7 @@ void IrcBot::begin(void)
 void IrcBot::end(void)
 {
 	if (conn.connected()) {
-		conn.write("QUIT :Bot quitting via end()\r\n");
+		writebuf("QUIT :Bot quitting via end()\r\n");
 		delay(250);
 		conn.stop();
 		executeOnDisconnectCallback();
@@ -257,7 +266,7 @@ void IrcBot::setNick(const char *nick)
 		strcpy(buf, "NICK ");
 		strcat(buf, _ircnick);
 		strcat(buf, "\r\n");
-		conn.write(buf);
+		writebuf(buf);
 	}
 }
 
@@ -302,7 +311,7 @@ int IrcBot::removeChannel(const int chanidx)
 		strcpy(buf, "PART ");
 		strcat(buf, _ircchannels[chanidx]);
 		strcat(buf, "\r\n");
-		conn.write(buf);
+		writebuf(buf);
 	}
 	chanState[chanidx] = IRC_CHAN_NOTJOINED;
 	_ircchannels[chanidx][0] = '\0';
@@ -357,17 +366,17 @@ boolean IrcBot::sendPrivmsg(const char *chan, const char *tonick, const char *me
 	
 	// All set; send message
 	Dbg->print(">> sendPrivmsg - Sending message PRIVMSG "); Dbg->print(_ircchannels[i]); Dbg->print(" :");
-	conn.write("PRIVMSG ");
-	conn.write(_ircchannels[i]);
-	conn.write(" :");
+	writebuf("PRIVMSG ");
+	writebuf(_ircchannels[i]);
+	writebuf(" :");
 	if (tonick != NULL) {
 		Dbg->print(tonick); Dbg->print(": ");
-		conn.write(tonick);
-		conn.write(": ");
+		writebuf(tonick);
+		writebuf(": ");
 	}
 	Dbg->println(message);
-	conn.write(message);
-	conn.write("\r\n");
+	writebuf(message);
+	writebuf("\r\n");
 	return true;
 }
 
@@ -398,16 +407,16 @@ boolean IrcBot::sendPrivmsgCtcp(const char *chan, const char *ctcpcmd, const cha
 	
 	// All set; send message
 	Dbg->print(">> sendPrivmsgCtcp - Sending CTCP message "); Dbg->print(_ircchannels[i]); Dbg->print(" :");
-	conn.write("PRIVMSG ");
-	conn.write(_ircchannels[i]);
-	conn.write(" :\001");
-	conn.write(ctcpcmd);
-	conn.write(' ');
+	writebuf("PRIVMSG ");
+	writebuf(_ircchannels[i]);
+	writebuf(" :\001");
+	writebuf(ctcpcmd);
+	writebuf(' ');
 	Dbg->print(ctcpcmd); Dbg->print(' ');
 	Dbg->println(message);
-	conn.write(message);
-	conn.write('\001');
-	conn.write("\r\n");
+	writebuf(message);
+	writebuf('\001');
+	writebuf("\r\n");
 	return true;
 }
 
@@ -539,11 +548,11 @@ void IrcBot::processInboundData(void)
 	char tmpbuf[64];
 	char from_nick[IRC_NICKUSER_MAXLEN], from_user[IRC_NICKUSER_MAXLEN], from_host[IRC_SERVERNAME_MAXLEN];
 	char *tochan, *tonick = NULL, *tmp1 = NULL, *tmp2 = NULL, *msgstart = NULL;
-	boolean is_from_user, found_cmd;
+	boolean is_from_user, found_cmd, found_authnick;
 
 	Dbg->print("issuing read-");
-	if ((len = conn.read(tcpbuf, IRC_INGRESS_BUFFER_LEN)) > 0) {
-		Dbg->println(" done");
+	len = conn.read(tcpbuf, IRC_INGRESS_BUFFER_LEN);
+	if (len > 0) {
 		Dbg->print("Stuffing "); Dbg->print(len); Dbg->println(" bytes into ring buffer-");
 		// Add data to ring buffer
 		for (i=0; i < len; i++) {
@@ -555,12 +564,11 @@ void IrcBot::processInboundData(void)
 		Dbg->print("Ring buffer has "); Dbg->print(ringBufferLen()); Dbg->println(" bytes; processing:");
 		// Process incoming message
 		while (ringBufferSearch('\r') >= 0) {  // A full message is available.
-			Dbg->print("Found \\r... ");
 			len = ringBufferSearchConsume(packet, '\r');
-			Dbg->print("Read "); Dbg->print(len); Dbg->print(" bytes... ");
+			//Dbg->print("Read "); Dbg->print(len); Dbg->print(" bytes... ");
 			// Flush \r and \n
 			ringBufferFlush(2);
-			Dbg->println("Flushed \\r\\n");
+			//Dbg->println("Flushed \\r\\n");
 
 			packet[len] = '\0';
 			Dbg->print("RECV: "); Dbg->println(packet);
@@ -624,7 +632,7 @@ void IrcBot::processInboundData(void)
 						}
 						strcat(packet, "\r\n");
 						Dbg->print(">> Responding with: "); Dbg->println(packet);
-						conn.write((char *)packet);
+						writebuf((char *)packet);
 						break;
 
 					case IRC_CMDTOKEN_PONG:  // Received PONG from a prior PING
@@ -791,9 +799,11 @@ void IrcBot::processInboundData(void)
 										// Source nick is in from_nick
 										j = 0;
 										tmp2 = commandCallbackRegistry[i].authnicks[j];
+										found_authnick = false;
 										while (tmp2 != NULL && tmp2[0] != '\0') {
 											if (!strncmp(from_nick, tmp2, IRC_NICKUSER_MAXLEN)) {
 												// Found from_nick in authnicks; proceed to execute callback
+												found_authnick = true;
 												Dbg->println(">> Nick authorized; executing callback");
 												commandCallbackRegistry[i].callback(commandCallbackRegistry[i].userobj,
 																					tochan,
@@ -804,13 +814,15 @@ void IrcBot::processInboundData(void)
 											j++;
 											tmp2 = commandCallbackRegistry[i].authnicks[j];
 										}
-										Dbg->println(">> Nick not found in authnicks list.");
-										if (commandCallbackRegistry[i].unauth_callback != NULL) {
-											Dbg->println(">> Executing unauthorized-attempt callback for this command");
-											commandCallbackRegistry[i].unauth_callback(commandCallbackRegistry[i].userobj,
-																					   tochan,
-																					   from_nick,
-																					   tmp1);
+										if (!found_authnick) {
+											Dbg->println(">> Nick not found in authnicks list.");
+											if (commandCallbackRegistry[i].unauth_callback != NULL) {
+												Dbg->println(">> Executing unauthorized-attempt callback for this command");
+												commandCallbackRegistry[i].unauth_callback(commandCallbackRegistry[i].userobj,
+																						   tochan,
+																						   from_nick,
+																						   tmp1);
+											}
 										}
 									} /* if (authnicks == NULL) */
 								} /* if (found a matching callback for this command) */

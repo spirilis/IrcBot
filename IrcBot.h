@@ -1,6 +1,6 @@
-/* IrcBot - IRC client class for managing an IRC connection using the Ethernet
+/* IrcBot - IRC client class for managing an IRC connection using the Ethernet or WiFi
  * library.  Intended for running an IRC bot under the hood with a Tiva-C Connected
- * LaunchPad.
+ * LaunchPad, or CC3200 SimpleLinkWiFi LaunchPad.
  */
 
 #ifndef IRCBOT_H
@@ -8,20 +8,29 @@
 
 #include <Energia.h>
 #include <inttypes.h>
-#include <Ethernet.h>
-#include <EthernetClient.h>
 #include <string.h>
+
+
+#define IRC_NETWORK_CLIENT_CLASS WiFiClient
+#include <WiFi.h>
+#include <WiFiClient.h>
+
+//#define IRC_NETWORK_CLIENT_CLASS EthernetClient
+//#include <Ethernet.h>
+//#include <EthernetClient.h>
+
+
 
 #define IRC_CHANNEL_MAX 4
 #define IRC_CHANNEL_MAXLEN 32
-#define IRC_CALLBACK_MAX_CHANNELNICK 256
-#define IRC_COMMAND_REGISTRY_MAX 64
+#define IRC_CALLBACK_MAX_CHANNELNICK 64
+#define IRC_COMMAND_REGISTRY_MAX 16
 #define IRC_SERVERNAME_MAXLEN 64
 #define IRC_NICKUSER_MAXLEN 32
 #define IRC_DESCRIPTION_MAXLEN 128
 #define IRC_INGRESS_BUFFER_LEN 512
 #define IRC_INGRESS_RINGBUF_LEN 1024
-#define IRC_CMDTOK_MAX 64
+#define IRC_CMDTOK_MAX 16
 
 typedef void(*IRC_CALLBACK_TYPE_CONNECT)(void *userobj);
 typedef void(*IRC_CALLBACK_TYPE_CHANNEL)(void *userobj, const char *channel);
@@ -78,7 +87,7 @@ enum {
 
 class IrcBot {
 	private:
-		EthernetClient conn;
+		IRC_NETWORK_CLIENT_CLASS conn;
 		Stream *Dbg;
 		int botState;
 		char _ircnick[IRC_NICKUSER_MAXLEN], _ircuser[IRC_NICKUSER_MAXLEN], _ircdescription[IRC_DESCRIPTION_MAXLEN];
@@ -103,6 +112,10 @@ class IrcBot {
 		unsigned int ringBufferSearchFlush(const uint8_t search);
 		unsigned int ringBufferConsume(void *buf, const unsigned int maxlen);
 		unsigned int ringBufferFlush(const unsigned int count);
+		void writebuf(const uint8_t *buf);
+		void writebuf(const char *buf) { writebuf((const uint8_t *)buf); };
+        void writebuf(const char c) { conn.write((uint8_t)c); };
+        void writebuf(const uint8_t c) { conn.write(c); };
 
 		/* Callback handling */
 		// Connect & disconnect (only 1 allowed)
