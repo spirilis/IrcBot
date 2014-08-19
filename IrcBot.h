@@ -11,20 +11,20 @@
 #include <string.h>
 
 
-#define IRC_NETWORK_CLIENT_CLASS WiFiClient
-#include <WiFi.h>
-#include <WiFiClient.h>
+//#define IRC_NETWORK_CLIENT_CLASS WiFiClient
+//#include <WiFi.h>
+//#include <WiFiClient.h>
 
-//#define IRC_NETWORK_CLIENT_CLASS EthernetClient
-//#include <Ethernet.h>
-//#include <EthernetClient.h>
+#define IRC_NETWORK_CLIENT_CLASS EthernetClient
+#include <Ethernet.h>
+#include <EthernetClient.h>
 
 
 
 #define IRC_CHANNEL_MAX 4
 #define IRC_CHANNEL_MAXLEN 32
 #define IRC_CALLBACK_MAX_CHANNELNICK 64
-#define IRC_COMMAND_REGISTRY_MAX 16
+#define IRC_COMMAND_REGISTRY_MAX 32
 #define IRC_SERVERNAME_MAXLEN 64
 #define IRC_NICKUSER_MAXLEN 32
 #define IRC_DESCRIPTION_MAXLEN 128
@@ -114,8 +114,8 @@ class IrcBot {
 		unsigned int ringBufferFlush(const unsigned int count);
 		void writebuf(const uint8_t *buf);
 		void writebuf(const char *buf) { writebuf((const uint8_t *)buf); };
-        void writebuf(const char c) { conn.write((uint8_t)c); };
-        void writebuf(const uint8_t c) { conn.write(c); };
+		void writebuf(const char c) { conn.write((uint8_t)c); };
+		void writebuf(const uint8_t c) { conn.write(c); };
 
 		/* Callback handling */
 		// Connect & disconnect (only 1 allowed)
@@ -184,6 +184,8 @@ class IrcBot {
 		boolean detachOnPart( const char *channel );
 		boolean detachOnUserJoin( const char *channel, const char *nick );
 		boolean detachOnUserPart( const char *channel, const char *nick );
+		boolean flushUserJoinOrPart( const char *channel );
+		boolean flushUserJoinOrPartByChanIdx( const int chanidx );
 		boolean detachOnCommand( const char *cmd );
 		boolean detachOnUnknownCommand(void);
 		boolean detachOnCommandUnauthorized( const char *cmd );

@@ -313,6 +313,20 @@ int IrcBot::removeChannel(const int chanidx)
 		strcat(buf, "\r\n");
 		writebuf(buf);
 	}
+
+	// Flush callback entries related to this channel
+	flushUserJoinOrPartByChanIdx(chanidx);
+
+	if (channelJoinCallbacks[chanidx].callback != NULL) {
+		channelJoinCallbacks[chanidx].callback = NULL;
+		channelJoinCallbacks[chanidx].userobj = NULL;
+	}
+	if (channelPartCallbacks[chanidx].callback != NULL) {
+		channelPartCallbacks[chanidx].callback = NULL;
+		channelPartCallbacks[chanidx].userobj = NULL;
+	}
+
+	// Deactivate channel slot
 	chanState[chanidx] = IRC_CHAN_NOTJOINED;
 	_ircchannels[chanidx][0] = '\0';
 	return chanidx;
@@ -1227,6 +1241,50 @@ boolean IrcBot::detachOnUserPart(const char *channel, const char *nick)
 	return false;  // Channel+Nick combination not found in registry
 }
 
+
+boolean IrcBot::flushUserJoinOrPartByChanIdx(const int chanidx)
+{
+	int j;
+
+	if (chanidx < 0 || chanidx >= IRC_CHANNEL_MAX)
+		return false;
+
+	for (j=0; j < IRC_CALLBACK_MAX_CHANNELNICK; j++) {
+		if (channelUserPartCallbacks[j].callback != NULL &&
+			channelUserPartCallbacks[j].chanidx == chanidx) {
+
+			channelUserPartCallbacks[j].callback = NULL;
+			channelUserPartCallbacks[j].chanidx = -1;
+			channelUserPartCallbacks[j].userobj = NULL;
+			channelUserPartCallbacks[j].nick[0] = '\0';
+		}
+		if (channelUserJoinCallbacks[j].callback != NULL &&
+			channelUserJoinCallbacks[j].chanidx == chanidx) {
+
+			channelUserJoinCallbacks[j].callback = NULL;
+			channelUserJoinCallbacks[j].chanidx = -1;
+			channelUserJoinCallbacks[j].userobj = NULL;
+			channelUserJoinCallbacks[j].nick[0] = '\0';
+		}
+	}
+
+	return true;
+}
+
+boolean IrcBot::flushUserJoinOrPart(const char *channel)
+{
+	int i, j;
+
+	// Find the channel in the bot's channel registry
+	for (i=0; i < IRC_CHANNEL_MAX; i++) {
+		if (_ircchannels[i][0] != '\0' && !strncmp(_ircchannels[i], channel, IRC_CHANNEL_MAXLEN))
+			break;
+	}
+	if (i == IRC_CHANNEL_MAX)
+		return false;  // Channel not found in current bot configuration
+
+	return flushUserJoinOrPartByChanIdx(i);
+}
 
 
 
