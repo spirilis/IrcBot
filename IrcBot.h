@@ -144,8 +144,12 @@ class IrcBot {
 
 
 	public:
+		static const uint32_t version;
+		static const char *versionString;
+
 		IrcBot();
 		IrcBot(Stream *debugStream, const char *server, const char *nick, const char *user, const char *desc);
+
 		void setServer(const char *server);
 		void setPort(uint16_t ircPort);
 		void setNick(const char *nick);

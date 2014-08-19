@@ -6,6 +6,9 @@
 #include <IrcBot.h>
 
 
+const uint32_t IrcBot::version = 0x00000100;
+const char *IrcBot::versionString = "v1.0";
+
 IrcBot::IrcBot(Stream *debugStream, const char *server, const char *nick, const char *user, const char *desc)
 {
 	Dbg = debugStream;
