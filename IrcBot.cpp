@@ -91,6 +91,8 @@ void IrcBot::writebuf(const uint8_t *buf)
 }
 
 /* Main loop where all the processing happens */
+static uint32_t millis_throttle = 0;
+
 void IrcBot::loop(void)
 {
 	int i = 0, j = 0;
@@ -105,6 +107,7 @@ void IrcBot::loop(void)
 			botState = IRC_DISCONNECTED;
 			// If registered, run OnDisconnect callback
 			executeOnDisconnectCallback();
+			millis_throttle = millis();  // 2-second throttle for reconnect
 		} else {
 			if (conn.available() || ringBufferLen() > 0) {
 				Dbg->println("processInboundData()");
@@ -117,23 +120,26 @@ void IrcBot::loop(void)
 
 	switch (botState) {
 		case IRC_DISCONNECTED:
-			if (conn.connected()) {
+			if (conn.connected() ) {
 				Dbg->println("Network shows us connected");
 				botState++;
 			} else {
-				Dbg->println("Attempting to connect-");
-				Dbg->print("conn.connect(\""); Dbg->print(_ircserver);
-				Dbg->print("\", "); Dbg->print(_ircport); Dbg->println(");");
-				i = conn.connect(_ircserver, _ircport);
-				Dbg->print("conn.connect() return status = "); Dbg->println(i);
-				if (i == 1) {  // Connect() successful
-					for (i=0; i < IRC_CHANNEL_MAX; i++)
-						chanState[i] = IRC_CHAN_NOTJOINED;
-					ringbuf_start = ringbuf_end = 0;
-					_hasmotd = false;
-					botState++;
-				} else {
-					Dbg->println("Connection attempt unsuccessful; trying again");
+				if ( (millis() - millis_throttle) > 2000 ) {  // 2-second throttle between connect attempts
+					Dbg->println("Attempting to connect-");
+					Dbg->print("conn.connect(\""); Dbg->print(_ircserver);
+					Dbg->print("\", "); Dbg->print(_ircport); Dbg->println(");");
+					i = conn.connect(_ircserver, _ircport);
+					Dbg->print("conn.connect() return status = "); Dbg->println(i);
+					if (i == 1) {  // Connect() successful
+						for (i=0; i < IRC_CHANNEL_MAX; i++)
+							chanState[i] = IRC_CHAN_NOTJOINED;
+						ringbuf_start = ringbuf_end = 0;
+						_hasmotd = false;
+						botState++;
+					} else {
+						Dbg->println("Connection attempt unsuccessful; trying again in 2 seconds");
+						millis_throttle = millis();  // Add 2-second throttle for reconnect
+					}
 				}
 			}
 			return;
