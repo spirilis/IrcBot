@@ -140,6 +140,10 @@ class IrcBot {
 		void *disconnectCallbackUserobj;
 		void executeOnDisconnectCallback(void);
 
+		IRC_CALLBACK_TYPE_CONNECT motdFinishedCallback;
+		void *motdFinishedCallbackUserobj;
+		void executeOnMotdFinishedCallback(void);
+
 		// Channel join & part (only 1 allowed per channel)
 		ChanCallbackRegistry channelJoinCallbacks[IRC_CHANNEL_MAX];
 		void executeOnChannelJoinCallback(const int);
@@ -176,6 +180,7 @@ class IrcBot {
 		void loop(void);  // Run a loop of the IRC Bot's state machine
 		boolean sendPrivmsg(const char *chan, const char *tonick, const char *message);
 		boolean sendPrivmsgCtcp(const char *chan, const char *ctcpcmd, const char *message);
+		boolean sendPrivmsgUser(const char *user, const char *message);
 		int getState(void);  // Get the master state of the bot in enum value
 		const char *getStateStrerror(void);
 		boolean parseUserHostString(const void *str, char *nick, char *user, char *host);
@@ -186,6 +191,7 @@ class IrcBot {
 
 		boolean attachOnConnect( IRC_CALLBACK_TYPE_CONNECT, const void *userobj );
 		boolean attachOnDisconnect( IRC_CALLBACK_TYPE_CONNECT, const void *userobj );
+		boolean attachOnMotdFinished( IRC_CALLBACK_TYPE_CONNECT, const void *userobj );
 		boolean attachOnJoin( const char *channel, IRC_CALLBACK_TYPE_CHANNEL, const void *userobj );
 		boolean attachOnPart( const char *channel, IRC_CALLBACK_TYPE_CHANNEL, const void *userobj );
 		boolean attachOnUserJoin( const char *channel, const char *nick, IRC_CALLBACK_TYPE_CHANNEL_USER, const void *userobj );
@@ -197,6 +203,7 @@ class IrcBot {
 
 		boolean detachOnConnect(void);
 		boolean detachOnDisconnect(void);
+		boolean detachOnMotdFinished(void);
 		boolean detachOnJoin( const char *channel );
 		boolean detachOnPart( const char *channel );
 		boolean detachOnUserJoin( const char *channel, const char *nick );

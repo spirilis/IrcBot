@@ -451,6 +451,26 @@ boolean IrcBot::sendPrivmsgCtcp(const char *chan, const char *ctcpcmd, const cha
 	return true;
 }
 
+boolean IrcBot::sendPrivmsgUser(const char *user, const char *message)
+{
+	int i;
+
+	if (botState != IRC_MOTD_FINISHED) {
+		Dbg->println(">> sendPrivmsgUser: botState != IRC_MOTD_FINISHED");
+		return false;
+	}
+
+	// All set; send message
+	Dbg->print(">> sendPrivmsgUser - Sending message PRIVMSG "); Dbg->print(user); Dbg->print(" :");
+	writebuf("PRIVMSG ");
+	writebuf(user);
+	writebuf(" :");
+	Dbg->println(message);
+	writebuf(message);
+	writebuf("\r\n");
+	return true;
+}
+
 inline unsigned int IrcBot::ringBufferLen(void)
 {
 	if (ringbuf_start > ringbuf_end)
@@ -679,6 +699,8 @@ void IrcBot::processInboundData(void)
 						if (botState > IRC_REGISTERING_USER)
 							botState = IRC_MOTD_FINISHED;
 						_hasmotd = true;
+						// Process event onMotdFinished
+						executeOnMotdFinishedCallback();
 						break;
 
 					case IRC_CMDTOKEN_JOIN:
@@ -1044,6 +1066,35 @@ void IrcBot::executeOnDisconnectCallback(void)
 	if (disconnectCallback != NULL) {
 		Dbg->println(">> Executing OnDisconnect callback");
 		disconnectCallback(disconnectCallbackUserobj);
+	}
+}
+
+/* Callback handler - On MOTD finished (fully attached to IRC server, ready to run commands) */
+boolean IrcBot::attachOnMotdFinished(IRC_CALLBACK_TYPE_CONNECT callback, const void *userobj)
+{
+	if (motdFinishedCallback != NULL)
+		return false;  // Already registered!
+
+	motdFinishedCallback = callback;
+	motdFinishedCallbackUserobj = (void *)userobj;
+	return true;
+}
+
+boolean IrcBot::detachOnMotdFinished(void)
+{
+	if (motdFinishedCallback == NULL)
+		return false;  // Not registered in the first place!
+
+	motdFinishedCallback = NULL;
+	motdFinishedCallbackUserobj = NULL;
+	return true;
+}
+
+void IrcBot::executeOnMotdFinishedCallback(void)
+{
+	if (motdFinishedCallback != NULL) {
+		Dbg->println(">> Executing OnMotdFinished callback");
+		motdFinishedCallback(motdFinishedCallbackUserobj);
 	}
 }
 
